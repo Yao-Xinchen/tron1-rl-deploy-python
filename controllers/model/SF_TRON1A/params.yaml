@@ -1,5 +1,5 @@
 PointfootCfg:
-  loop_frequency: 500
+  loop_frequency: 500 # time step = 0.002
   joint_names:
     - "abad_L_Joint"
     - "hip_L_Joint"
@@ -30,7 +30,7 @@ PointfootCfg:
     ankle_joint_damping: 1.5 # 0.8
     ankle_joint_torque_limit: 20
     action_scale_pos: 0.25
-    decimation: 10
+    decimation: 1 # action_repeat = 1
     user_torque_limit: 80
 
   normalization:
@@ -39,20 +39,16 @@ PointfootCfg:
       clip_actions: 100.
     obs_scales:
       lin_vel: 2.0
-      ang_vel: 0.25
+      ang_vel: 1.0
       dof_pos: 1.0
-      dof_vel: 0.05
+      dof_vel: 1.0
 
   size:
     actions_size: 8
-    observations_size: 36
+    observations_size: 37
     obs_history_length: 5
     encoder_output_size: 3
     commands_size: 5
-
-  gait:
-    frequencies: 1.3
-    swing_height: 0.12
 
   stand_mode:
     stand_duration: 1.0
@@ -64,5 +60,5 @@ PointfootCfg:
 
   user_cmd_scales:
     lin_vel_x: 1.0
-    lin_vel_y: 0.5
+    lin_vel_y: 1.0
     ang_vel_yaw: 1.0

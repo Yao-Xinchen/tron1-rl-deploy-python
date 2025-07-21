@@ -22,7 +22,6 @@ class SolefootController:
         # Load configuration and model file paths based on robot type
         self.config_file = f'{model_dir}/{self.robot_type}/params.yaml'
         self.model_policy = f'{model_dir}/{self.robot_type}/policy/policy.onnx'
-        self.model_encoder = f'{model_dir}/{self.robot_type}/policy/encoder.onnx'
 
         # Load configuration settings from the YAML file
         self.load_config(self.config_file)
@@ -76,12 +75,14 @@ class SolefootController:
         # Flag to start the controller
         self.start_controller = start_controller
 
-        # Gait index
-        self.gait_index = 0
-
         # Flag indicating first received observation
         self.is_first_rec_obs = True
-    
+
+        # Phase
+        self.gait_freq = 1.5
+        self.phase_dt = 2 * np.pi / self.loop_frequency * self.gait_freq
+        self.phase = np.array([0.0, np.pi])
+
     def initialize_onnx_models(self):
         # Configure ONNX Runtime session options to optimize CPU usage
         session_options = ort.SessionOptions()
@@ -105,12 +106,10 @@ class SolefootController:
         self.policy_output_names = [self.policy_session.get_outputs()[i].name for i in range(self.policy_session.get_outputs().__len__())]
         self.policy_input_shapes = [self.policy_session.get_inputs()[i].shape for i in range(self.policy_session.get_inputs().__len__())]
         self.policy_output_shapes = [self.policy_session.get_outputs()[i].shape for i in range(self.policy_session.get_outputs().__len__())]
-
-        self.encoder_session = ort.InferenceSession(self.model_encoder, sess_options=session_options, providers=cpu_providers)
-        self.encoder_input_names = [self.encoder_session.get_inputs()[i].name for i in range(self.encoder_session.get_inputs().__len__())]
-        self.encoder_output_names = [self.encoder_session.get_outputs()[i].name for i in range(self.encoder_session.get_outputs().__len__())]
-        self.encoder_input_shapes = [self.encoder_session.get_inputs()[i].shape for i in range(self.encoder_session.get_inputs().__len__())]
-        self.encoder_output_shapes = [self.encoder_session.get_outputs()[i].shape for i in range(self.encoder_session.get_outputs().__len__())]
+        print(f"Input names: {self.policy_input_names}")
+        print(f"Output names: {self.policy_output_names}")
+        print(f"Input shapes: {self.policy_input_shapes}")
+        print(f"Output shapes: {self.policy_output_shapes}")
 
     # Load the configuration from a YAML file
     def load_config(self, config_file):
@@ -128,15 +127,11 @@ class SolefootController:
         self.commands_size = config['PointfootCfg']['size']['commands_size']
         self.observations_size = config['PointfootCfg']['size']['observations_size']
         self.obs_history_length = config['PointfootCfg']['size']['obs_history_length']
-        self.encoder_output_size = config['PointfootCfg']['size']['encoder_output_size']
         self.imu_orientation_offset = np.array(list(config['PointfootCfg']['imu_orientation_offset'].values()))
         self.user_cmd_cfg = config['PointfootCfg']['user_cmd_scales']
         self.loop_frequency = config['PointfootCfg']['loop_frequency']
-        self.encoder_input_size = self.obs_history_length * self.observations_size
 
         # Initialize variables for actions, observations, and commands
-        self.proprio_history_vector = np.zeros(self.obs_history_length * self.observations_size)
-        self.encoder_out = np.zeros(self.encoder_output_size)
         self.actions = np.zeros(self.actions_size)
         self.observations = np.zeros(self.observations_size)
         self.last_actions = np.zeros(self.actions_size)
@@ -151,9 +146,6 @@ class SolefootController:
 
         self.ankle_joint_damping = config['PointfootCfg']['control']['ankle_joint_damping']
         self.ankle_joint_torque_limit = config['PointfootCfg']['control']['ankle_joint_torque_limit']
-
-        self.gait_frequencies = config['PointfootCfg']['gait']['frequencies']
-        self.gait_swing_height = config['PointfootCfg']['gait']['swing_height']
 
         # Initialize joint angles based on the initial configuration
         self.init_joint_angles = np.zeros(len(self.joint_names))
@@ -211,8 +203,9 @@ class SolefootController:
 
         # Execute actions every 'decimation' iterations
         if self.loop_count % self.control_cfg['decimation'] == 0:
+            phase_tp1 = self.phase + self.phase_dt
+            self.phase = np.fmod(phase_tp1 + np.pi, 2 * np.pi) - np.pi
             self.compute_observation()
-            self.compute_encoder()
             self.compute_actions()
             # Clip the actions within predefined limits
             action_min = -self.rl_cfg['clip_scales']['clip_actions']
@@ -273,14 +266,13 @@ class SolefootController:
         joint_positions = np.array(self.robot_state_tmp.q)
         joint_velocities = np.array(self.robot_state_tmp.dq)
 
-        gait = np.array([self.gait_frequencies, 0.5, 0.5, self.gait_swing_height])
-        self.gait_index += 0.02 * gait[0]
-        if self.gait_index > 1.0:
-            self.gait_index = 0.0
-        gait_clock = np.array([np.sin(self.gait_index * 2 * np.pi), np.cos(self.gait_index * 2 * np.pi)])
-
         # Retrieve the last actions that were applied to the robot
         actions = np.array(self.last_actions)
+
+        # Phase
+        cos = np.cos(self.phase)
+        sin = np.sin(self.phase)
+        phase = np.concatenate([cos, sin])
 
         # Create a command scaler matrix for linear and angular velocities
         command_scaler = np.diag([
@@ -296,47 +288,15 @@ class SolefootController:
         # Populate observation vector
         joint_pos_input = (joint_positions - self.init_joint_angles) * self.obs_scales['dof_pos']
 
-        # Create the observation vector by concatenating various state variables:
-        # - Base angular velocity (scaled)
-        # - Projected gravity vector
-        # - Joint positions (difference from initial angles, scaled)
-        # - Joint velocities (scaled)
-        # - Last actions applied to the robot
-        # - gait_clock: A clock signal related to the gait of the robot.
-        # - gait: Information about the current gait of the robot.
         obs = np.concatenate([
-            base_ang_vel * self.obs_scales['ang_vel'],  # Scaled base angular velocity
-            projected_gravity,  # Projected gravity vector in body frame
-            joint_pos_input,  # Scaled joint positions
-            joint_velocities * self.obs_scales['dof_vel'],  # Scaled joint velocities
-            actions,  # Last actions taken by the robot
-            gait_clock,  # A clock signal related to the robot's gait
-            gait  # Information about the current gait pattern of the robot
+            base_ang_vel * self.obs_scales['ang_vel'],  # gyro
+            projected_gravity,  # gravity
+            self.scaled_commands[:3],  # scaled commands
+            joint_pos_input,
+            joint_velocities * self.obs_scales['dof_vel'],  # joint velocities
+            actions,  # last actions
+            phase,  # phase
         ])
-
-        # Check if this is the first recorded observation
-        if self.is_first_rec_obs:
-            # Calculate the total size of the encoder input
-            input_size = np.prod(self.encoder_input_shapes[0])
-            
-            # Initialize the proprioceptive history buffer with zeros
-            self.proprio_history_buffer = np.zeros(input_size)
-
-            # Fill the proprioceptive history buffer with the current observation for the entire history length
-            for i in range(self.obs_history_length):
-                self.proprio_history_buffer[i * self.observations_size:(i + 1) * self.observations_size] = obs
-
-            # Update the flag to indicate that the first observation has been processed
-            self.is_first_rec_obs = False
-        
-        # Shift the existing proprioceptive history buffer to the left
-        self.proprio_history_buffer[:-self.observations_size] = self.proprio_history_buffer[self.observations_size:]
-
-        # Add the current observation to the end of the proprioceptive history buffer
-        self.proprio_history_buffer[-self.observations_size:] = obs
-
-        # Convert the proprioceptive history buffer to a numpy array
-        self.proprio_history_vector = np.array(self.proprio_history_buffer)
 
         # Clip the observation values to within the specified limits for stability
         self.observations = np.clip(
@@ -350,7 +310,7 @@ class SolefootController:
         Computes the actions based on the current observations using the policy session.
         """
         # Concatenate observations into a single tensor and convert to float32
-        input_tensor = np.concatenate([self.encoder_out, self.observations, self.scaled_commands], axis=0)
+        input_tensor = self.observations.reshape(1, -1)
         input_tensor = input_tensor.astype(np.float32)
         
         # Create a dictionary of inputs for the policy session
@@ -361,29 +321,8 @@ class SolefootController:
         
         # Flatten the output and store it as actions
         self.actions = np.array(output).flatten()
+        print(f"Actions: {self.actions}")
 
-    def compute_encoder(self):
-        """
-        Computes the encoder output based on the proprioceptive history buffer.
-
-        This method first concatenates the proprioceptive history buffer into a single input tensor.
-        Then it converts the input tensor to the float32 data type. After that, it creates a dictionary
-        of inputs for the encoder session and runs the encoder session to get the output. Finally,
-        it flattens the output and stores it as the encoder output.
-        """
-        # Concatenate the proprioceptive history buffer into a single tensor and convert to float32
-        input_tensor = np.concatenate([self.proprio_history_buffer], axis=0)
-        input_tensor = input_tensor.astype(np.float32)
-
-        # Create a dictionary of inputs for the encoder session
-        inputs = {self.encoder_input_names[0]: input_tensor}
-
-        # Run the encoder session and get the output
-        output = self.encoder_session.run(self.encoder_output_names, inputs)
-
-        # Flatten the output and store it as the encoder output
-        self.encoder_out = np.array(output).flatten()
- 
     def set_joint_command(self, joint_index, q, dq, tau, kp, kd):
         """
         Sends a command to configure the state of a specific joint.
