@@ -14,12 +14,12 @@ PointfootCfg:
     # target angles [rad] when action = 0.0
     default_joint_angle:
       abad_L_Joint: 0.0
-      hip_L_Joint: 0.13
+      hip_L_Joint: 0.092
       knee_L_Joint: 0.0
       ankle_L_Joint: 0.0
 
       abad_R_Joint: 0.0
-      hip_R_Joint: -0.13
+      hip_R_Joint: -0.092
       knee_R_Joint: 0.0
       ankle_R_Joint: 0.0
 
@@ -28,8 +28,8 @@ PointfootCfg:
     stiffness: 45.0
     damping: 3.0 # 1.5
     ankle_joint_damping: 1.5 # 0.8
-    ankle_joint_torque_limit: 20
-    action_scale_pos: 0.25
+    ankle_joint_torque_limit: 50
+    action_scale_pos: 0.5
     decimation: 1 # action_repeat = 1
     user_torque_limit: 80
 
@@ -38,7 +38,6 @@ PointfootCfg:
       clip_observations: 100.
       clip_actions: 100.
     obs_scales:
-      lin_vel: 2.0
       ang_vel: 1.0
       dof_pos: 1.0
       dof_vel: 1.0
@@ -46,9 +45,7 @@ PointfootCfg:
   size:
     actions_size: 8
     observations_size: 37
-    obs_history_length: 5
-    encoder_output_size: 3
-    commands_size: 5
+    commands_size: 3
 
   stand_mode:
     stand_duration: 1.0

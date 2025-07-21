@@ -126,7 +126,6 @@ class SolefootController:
         self.actions_size = config['PointfootCfg']['size']['actions_size']
         self.commands_size = config['PointfootCfg']['size']['commands_size']
         self.observations_size = config['PointfootCfg']['size']['observations_size']
-        self.obs_history_length = config['PointfootCfg']['size']['obs_history_length']
         self.imu_orientation_offset = np.array(list(config['PointfootCfg']['imu_orientation_offset'].values()))
         self.user_cmd_cfg = config['PointfootCfg']['user_cmd_scales']
         self.loop_frequency = config['PointfootCfg']['loop_frequency']
@@ -279,7 +278,6 @@ class SolefootController:
             self.user_cmd_cfg['lin_vel_x'],  # Scale factor for linear velocity in x direction
             self.user_cmd_cfg['lin_vel_y'],  # Scale factor for linear velocity in y direction
             self.user_cmd_cfg['ang_vel_yaw'],  # Scale factor for yaw (angular velocity)
-            1.0, 1.0
         ])
 
         # Apply scaling to the command inputs (velocity commands)
@@ -321,7 +319,7 @@ class SolefootController:
         
         # Flatten the output and store it as actions
         self.actions = np.array(output).flatten()
-        print(f"Actions: {self.actions}")
+        # print(f"Actions: {self.actions}")
 
     def set_joint_command(self, joint_index, q, dq, tau, kp, kd):
         """
