@@ -1,5 +1,5 @@
 PointfootCfg:
-  loop_frequency: 500
+  loop_frequency: 500 # time step = 0.002
   joint_names:
     - "abad_L_Joint"
     - "hip_L_Joint"
@@ -23,8 +23,8 @@ PointfootCfg:
     # PD Drive parameters:
     stiffness: 42.0
     damping: 3.5
-    action_scale_pos: 0.25
-    decimation: 10
+    action_scale_pos: 0.5
+    decimation: 1 # action_repeat = 1
     user_torque_limit: 80
 
   normalization:
@@ -32,17 +32,14 @@ PointfootCfg:
       clip_observations: 100.
       clip_actions: 100.
     obs_scales:
-      lin_vel: 2.0
-      ang_vel: 0.25
+      ang_vel: 1.0
       dof_pos: 1.0
-      dof_vel: 0.05
+      dof_vel: 1.0
 
   size:
     actions_size: 6
-    observations_size: 30
+    observations_size: 31
     commands_size: 3
-    obs_history_length: 10
-    encoder_output_size: 3
 
   stand_mode:
     stand_duration: 1.0
@@ -53,6 +50,6 @@ PointfootCfg:
     yaw: 0.0
 
   user_cmd_scales:
-    lin_vel_x: 1.5
+    lin_vel_x: 1.0
     lin_vel_y: 1.0
-    ang_vel_yaw: 0.5
+    ang_vel_yaw: 1.0
