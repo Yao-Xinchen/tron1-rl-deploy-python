@@ -79,7 +79,7 @@ class PointfootController:
         self.is_first_rec_obs = True
 
         # Phase
-        self.gait_freq = 1.5
+        self.gait_freq = 2.5
         self.phase_dt = 2 * np.pi / self.loop_frequency * self.gait_freq
         self.phase = np.array([0.0, np.pi])
     
