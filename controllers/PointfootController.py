@@ -138,8 +138,10 @@ class PointfootController:
         self.user_cmd_cfg = config['PointfootCfg']['user_cmd_scales']
         self.loop_frequency = config['PointfootCfg']['loop_frequency']
         # Initialize variables for actions, observations, and commands
+        self.obs_tensor = np.zeros((1, self.observations_size)).astype(np.float32)
+        self.obs_history_tensor = np.zeros((1, self.observations_size * 10)).astype(np.float32)
+        self.is_first_observation = True
         self.actions = np.zeros(self.actions_size)
-        self.observations = np.zeros(self.observations_size)
         self.last_actions = np.zeros(self.actions_size)
         self.commands = np.zeros(self.commands_size)  # command to the robot (e.g., velocity, rotation)
         self.scaled_commands = np.zeros(self.commands_size)
@@ -292,22 +294,34 @@ class PointfootController:
         ])
 
         # Clip the observation values to within the specified limits for stability
-        self.observations = np.clip(
+        self.obs_tensor = np.clip(
             obs, 
             -self.rl_cfg['clip_scales']['clip_observations'],  # Lower limit for clipping
             self.rl_cfg['clip_scales']['clip_observations']  # Upper limit for clipping
-        )
+        ).reshape(1, -1).astype(np.float32)
+
+        # Initialize or update obs_history_tensor
+        if self.is_first_observation:
+            # Initialize state history buffer with current state repeated 10 times (like simulation)
+            self.obs_history_tensor = np.tile(self.obs_tensor, (1, 10))
+            self.is_first_observation = False
+        else:
+            # Update obs_history_tensor with left shift and append current obs_tensor
+            self.obs_history_tensor = np.concatenate([
+                self.obs_history_tensor[:, self.observations_size:],  # left shift: remove oldest
+                self.obs_tensor  # append current observation
+            ], axis=1)
 
     def compute_actions(self):
         """
         Computes the actions based on the current observations using the policy session.
         """
-        # Concatenate observations into a single tensor and convert to float32
-        input_tensor = self.observations.reshape(1, -1)
-        input_tensor = input_tensor.astype(np.float32)
-        
-        # Create a dictionary of inputs for the policy session
-        inputs = {self.policy_input_names[0]: input_tensor}
+
+        # Create input dictionary - order matters and should match model input names
+        inputs = {
+            self.policy_input_names[0]: self.obs_tensor,  # 'obs'
+            self.policy_input_names[1]: self.obs_history_tensor  # 'obs_history'
+        }
         
         # Run the policy session and get the output
         output = self.policy_session.run(self.policy_output_names, inputs)
