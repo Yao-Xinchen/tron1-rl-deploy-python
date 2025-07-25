@@ -79,7 +79,7 @@ class PointfootController:
         self.is_first_rec_obs = True
 
         # Phase
-        self.gait_freq = 2.5
+        self.gait_freq = 2.0
         self.phase_dt = 2 * np.pi / self.loop_frequency * self.gait_freq
         self.phase = np.array([0.0, np.pi])
     
@@ -106,6 +106,13 @@ class PointfootController:
         self.policy_output_names = [self.policy_session.get_outputs()[i].name for i in range(self.policy_session.get_outputs().__len__())]
         self.policy_input_shapes = [self.policy_session.get_inputs()[i].shape for i in range(self.policy_session.get_inputs().__len__())]
         self.policy_output_shapes = [self.policy_session.get_outputs()[i].shape for i in range(self.policy_session.get_outputs().__len__())]
+
+        # Print model name from metadata
+        model_metadata = self.policy_session.get_modelmeta()
+        if hasattr(model_metadata, 'custom_metadata_map') and 'name' in model_metadata.custom_metadata_map:
+            print(f"Model name: \033[94m{model_metadata.custom_metadata_map['name']}\033[0m")
+        else:
+            print("Model name: \033[94mNot found in metadata\033[0m")
 
         print(f"Input names: {self.policy_input_names}")
         print(f"Output names: {self.policy_output_names}")
