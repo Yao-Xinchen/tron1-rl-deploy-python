@@ -80,7 +80,7 @@ class PointfootController:
 
         # Phase
         self.gait_freq = 2.0
-        self.phase_dt = 2 * np.pi / self.loop_frequency * self.gait_freq
+        self.phase_dt = 2 * np.pi * self.gait_freq * self.control_cfg['decimation'] / self.loop_frequency
         self.phase = np.array([0.0, np.pi])
     
     def initialize_onnx_models(self):
@@ -134,12 +134,13 @@ class PointfootController:
         self.actions_size = config['PointfootCfg']['size']['actions_size']
         self.commands_size = config['PointfootCfg']['size']['commands_size']
         self.observations_size = config['PointfootCfg']['size']['observations_size']
+        self.obs_history_length = config['PointfootCfg']['size']['obs_history_length']
         self.imu_orientation_offset = np.array(list(config['PointfootCfg']['imu_orientation_offset'].values()))
         self.user_cmd_cfg = config['PointfootCfg']['user_cmd_scales']
         self.loop_frequency = config['PointfootCfg']['loop_frequency']
         # Initialize variables for actions, observations, and commands
         self.obs_tensor = np.zeros((1, self.observations_size)).astype(np.float32)
-        self.obs_history_tensor = np.zeros((1, self.observations_size * 10)).astype(np.float32)
+        self.obs_history_tensor = np.zeros((1, self.observations_size * self.obs_history_length)).astype(np.float32)
         self.is_first_observation = True
         self.actions = np.zeros(self.actions_size)
         self.last_actions = np.zeros(self.actions_size)
@@ -302,8 +303,7 @@ class PointfootController:
 
         # Initialize or update obs_history_tensor
         if self.is_first_observation:
-            # Initialize state history buffer with current state repeated 10 times (like simulation)
-            self.obs_history_tensor = np.tile(self.obs_tensor, (1, 10))
+            self.obs_history_tensor = np.tile(self.obs_tensor, (1, self.obs_history_length))
             self.is_first_observation = False
         else:
             # Update obs_history_tensor with left shift and append current obs_tensor

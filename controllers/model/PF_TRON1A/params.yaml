@@ -24,7 +24,7 @@ PointfootCfg:
     stiffness: 42.0
     damping: 1.5
     action_scale_pos: 0.5
-    decimation: 1 # action_repeat = 1
+    decimation: 10
     user_torque_limit: 80
 
   normalization:
@@ -40,6 +40,7 @@ PointfootCfg:
     actions_size: 6
     observations_size: 31
     commands_size: 3
+    obs_history_length: 10
 
   stand_mode:
     stand_duration: 1.0
