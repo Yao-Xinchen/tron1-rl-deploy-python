@@ -144,7 +144,8 @@ class PointfootController:
         self.is_first_observation = True
         self.actions = np.zeros(self.actions_size)
         self.last_actions = np.zeros(self.actions_size)
-        self.commands = np.zeros(self.commands_size)  # command to the robot (e.g., velocity, rotation)
+        self.command_offsets = np.array(list(config['PointfootCfg']['user_cmd_offsets'].values()))
+        self.commands = self.command_offsets.copy()
         self.scaled_commands = np.zeros(self.commands_size)
         self.base_lin_vel = np.zeros(3)  # base linear velocity
         self.base_position = np.zeros(3)  # robot base position
@@ -413,9 +414,10 @@ class PointfootController:
         linear_y  = 1.0 if linear_y > 1.0 else (-1.0 if linear_y < -1.0 else linear_y)
         angular_z = 1.0 if angular_z > 1.0 else (-1.0 if angular_z < -1.0 else angular_z)
 
-        self.commands[0] = linear_x * 0.5
-        self.commands[1] = linear_y * 0.5
-        self.commands[2] = angular_z * 0.5
+        self.commands[0] = linear_x
+        self.commands[1] = linear_y
+        self.commands[2] = angular_z
+        self.commands += self.command_offsets
 
     # Callback function for receiving diagnostic data
     def robot_diagnostic_callback(self, diagnostic_value: datatypes.DiagnosticValue):
