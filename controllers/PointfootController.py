@@ -80,7 +80,7 @@ class PointfootController:
 
         # Phase
         self.gait_freq = 2.0
-        self.phase_dt = 2 * np.pi / self.loop_frequency * self.gait_freq
+        self.phase_dt = 2 * np.pi * self.gait_freq * self.control_cfg['decimation'] / self.loop_frequency
         self.phase = np.array([0.0, np.pi])
     
     def initialize_onnx_models(self):
