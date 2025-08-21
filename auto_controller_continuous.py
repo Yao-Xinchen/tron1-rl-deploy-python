@@ -44,23 +44,26 @@ class ComprehensiveEvaluationController:
         self.calibration_complete = False
         self.pattern_started = False
         
-        # Comprehensive evaluation pattern to test all aspects of policy performance
-        self.comprehensive_pattern = [
-            # Basic locomotion tests
-            {'linear_x': 0.3, 'linear_y': 0.0, 'angular_z': 0.0, 'duration': 10.0, 'description': 'Forward walk (slow)'},
-            {'linear_x': 1.0, 'linear_y': 0.0, 'angular_z': 0.0, 'duration': 10.0, 'description': 'Forward walk (fast)'},
-            {'linear_x': 0.0, 'linear_y': 0.0, 'angular_z': 0.0, 'duration': 5.0, 'description': 'Stationary'},
-            {'linear_x': -0.3, 'linear_y': 0.0, 'angular_z': 0.0, 'duration': 10.0, 'description': 'Backward walk (slow)'},
-            {'linear_x': -1.0, 'linear_y': 0.0, 'angular_z': 0.0, 'duration': 10.0, 'description': 'Backward walk (fast)'},
-
-            {'linear_x': 0.0, 'linear_y': 0.0, 'angular_z': 0.0, 'duration': 5.0, 'description': 'Stationary'},
-
-            {'linear_x': 0.0, 'linear_y': 0.0, 'angular_z': 0.3, 'duration': 10.0, 'description': 'Turn left (slow)'},
-            {'linear_x': 0.0, 'linear_y': 0.0, 'angular_z': 1.0, 'duration': 10.0, 'description': 'Turn left (fast)'},
-            {'linear_x': 0.0, 'linear_y': 0.0, 'angular_z': 0.0, 'duration': 5.0, 'description': 'Stationary'},
-            {'linear_x': 0.0, 'linear_y': 0.0, 'angular_z': -0.3, 'duration': 10.0, 'description': 'Turn right (slow)'},
-            {'linear_x': 0.0, 'linear_y': 0.0, 'angular_z': -1.0, 'duration': 10.0, 'description': 'Turn right (fast)'},
-        ]
+        # Continuous velocity increase pattern - gradually increase x velocity while keeping other commands at zero
+        self.velocity_increment = 0.2  # Increase by 0.1 m/s every step
+        self.max_velocity = .8  # Maximum velocity limit
+        self.step_duration = 5.0  # Duration for each velocity step
+        
+        # Generate pattern with continuously increasing x velocity
+        self.comprehensive_pattern = []
+        current_velocity = 0.0
+        step_count = 1
+        
+        while current_velocity <= self.max_velocity:
+            self.comprehensive_pattern.append({
+                'linear_x': current_velocity, 
+                'linear_y': 0.0, 
+                'angular_z': 0.0, 
+                'duration': self.step_duration, 
+                'description': f'Forward walk at {current_velocity:.1f} m/s'
+            })
+            current_velocity += self.velocity_increment
+            step_count += 1
         
         
     def signal_handler(self, signum, frame):
@@ -129,10 +132,10 @@ class ComprehensiveEvaluationController:
     def apply_joystick_command(self, linear_x, linear_y, angular_z):
         """Apply joystick command directly to the controller"""
         if self.controller:
-            # Clamp values to [-1, 1] range
-            linear_x = max(-1.0, min(1.0, linear_x))
-            linear_y = max(-1.0, min(1.0, linear_y))
-            angular_z = max(-1.0, min(1.0, angular_z))
+            # # Clamp values to [-1, 1] range
+            # linear_x = max(-1.0, min(1.0, linear_x))
+            # linear_y = max(-1.0, min(1.0, linear_y))
+            # angular_z = max(-1.0, min(1.0, angular_z))
             
             # Apply commands with offsets (same logic as in sensor_joy_callback)
             self.controller.commands[0] = linear_x

@@ -12,6 +12,8 @@ import limxsdk.robot.Rate as Rate
 import limxsdk.robot.Robot as Robot
 import limxsdk.robot.RobotType as RobotType
 import limxsdk.datatypes as datatypes
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.cmd_vel_logger import CmdVelLogger
 
 class PointfootController:
     def __init__(self, model_dir, robot, robot_type, start_controller):
@@ -82,6 +84,9 @@ class PointfootController:
         self.gait_freq = 2.0
         self.phase_dt = 2 * np.pi * self.gait_freq * self.control_cfg['decimation'] / self.loop_frequency
         self.phase = np.array([0.0, np.pi])
+        
+        # Initialize command velocity logger
+        self.cmd_vel_logger = CmdVelLogger()
     
     def initialize_onnx_models(self):
         # Configure ONNX Runtime session options to optimize CPU usage
@@ -184,6 +189,9 @@ class PointfootController:
         self.robot_cmd.Kp = [0. for x in range(0, self.joint_num)]
         self.robot_cmd.Kd = [1.0 for x in range(0, self.joint_num)]
         self.robot.publishRobotCmd(self.robot_cmd)
+        
+        # Close the command velocity logger
+        self.cmd_vel_logger.close()
         time.sleep(1)
 
     # Handle the stand mode for smoothly transitioning the robot into standing
@@ -345,6 +353,9 @@ class PointfootController:
             self.handle_stand_mode()
         elif self.mode == "WALK":
             self.handle_walk_mode()
+        
+        # Log command velocities to CSV
+        self.cmd_vel_logger.log_cmd_vel(self.commands[0], self.commands[1], self.commands[2])
         
         # Increment the loop count
         self.loop_count += 1
